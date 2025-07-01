@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -44,10 +45,11 @@ func main() {
 
 	// Routes
 	r.GET("/", handleIndex)
-	r.POST("/api/upload", handleUpload)
 	r.GET("/api/files", handleListFiles)
-	r.GET("/api/download/:filename", handleDownload)
-	r.DELETE("/api/files/:filename", handleDeleteFile)
+	r.POST("/api/upload", handleUpload)
+	r.GET("/api/download", handleDownload)
+	r.DELETE("/api/files", handleDeleteFile)
+	r.POST("/api/folders", handleCreateFolder)
 	r.GET("/ws/progress", handleWebSocket)
 
 	// Get port from environment or default to 8080
@@ -80,6 +82,7 @@ func handleUpload(c *gin.Context) {
 		return
 	}
 
+	currentPath := c.PostForm("currentPath")
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -105,7 +108,7 @@ func handleUpload(c *gin.Context) {
 	}
 
 	index, _ := strconv.Atoi(chunkIndex)
-	err = uploadChunk(buf, index, originalFilename, ws, totalSize, startOffset)
+	err = uploadChunk(buf, index, originalFilename, ws, totalSize, startOffset, currentPath)
 	if err != nil {
 		log.Printf("!!! UPLOAD FAILED: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -116,7 +119,11 @@ func handleUpload(c *gin.Context) {
 }
 
 func handleListFiles(c *gin.Context) {
-	files, err := listFiles()
+	path := c.Query("path")
+	if path == "" {
+		path = "/"
+	}
+	files, err := listFiles(path)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -125,11 +132,15 @@ func handleListFiles(c *gin.Context) {
 }
 
 func handleDownload(c *gin.Context) {
-	filename := c.Param("filename")
-	c.Header("Content-Disposition", "attachment; filename="+filename)
+	path := c.Query("path")
+	if path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path is required"})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename="+filepath.Base(path))
 	c.Header("Content-Type", "application/octet-stream")
 
-	err := downloadFile(filename, c.Writer)
+	err := downloadFile(path, c.Writer)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -137,13 +148,31 @@ func handleDownload(c *gin.Context) {
 }
 
 func handleDeleteFile(c *gin.Context) {
-	filename := c.Param("filename")
-	err := deleteFile(filename)
+	path := c.Query("path")
+	if path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path is required"})
+		return
+	}
+	err := deletePath(path)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "file deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "deleted successfully"})
+}
+
+func handleCreateFolder(c *gin.Context) {
+	path := c.PostForm("path")
+	if path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path is required"})
+		return
+	}
+	err := createDir(path)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "folder created successfully"})
 }
 
 func handleWebSocket(c *gin.Context) {
