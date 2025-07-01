@@ -27,25 +27,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const uploadFile = async (file) => {
         const totalChunks = Math.ceil(file.size / chunkSize);
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+
+        const uploadID = Date.now().toString() + Math.random().toString(36).substring(2);
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsURL = `${wsProtocol}://${window.location.host}/ws/progress?id=${uploadID}`;
+        const ws = new WebSocket(wsURL);
+
+        ws.onopen = () => {
+            console.log('WebSocket connected for upload:', uploadID);
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const progress = (data.totalWritten / data.totalSize) * 100;
+            progressBar.style.width = `${progress.toFixed(2)}%`;
+            progressBar.textContent = `${Math.round(progress)}%`;
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+            console.log('WebSocket disconnected.');
+            setTimeout(() => {
+                progressBar.textContent = '';
+                progressBar.style.width = '0%';
+            }, 3000);
+            fetchFiles();
+        };
+
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
             const start = chunkIndex * chunkSize;
             const end = Math.min(start + chunkSize, file.size);
             const chunk = file.slice(start, end);
-            
+
             const formData = new FormData();
             formData.append('file', chunk);
-            formData.append('chunkIndex', chunkIndex);
+            formData.append('chunkIndex', chunkIndex.toString());
             formData.append('originalFilename', file.name);
+            formData.append('uploadID', uploadID);
+            formData.append('totalSize', file.size.toString());
+            formData.append('startOffset', start.toString());
 
-            await fetch('/api/upload', {
+            const response = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
 
-            const progress = ((chunkIndex + 1) / totalChunks) * 100;
-            progressBar.style.width = `${progress}%`;
+            if (!response.ok) {
+                console.error('Upload chunk failed:', await response.text());
+                ws.close();
+                return;
+            }
         }
-        fetchFiles(); // Refresh file list after upload
+        ws.close();
     };
 
     uploadButton.addEventListener('click', () => {

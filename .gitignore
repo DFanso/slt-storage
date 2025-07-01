@@ -26,3 +26,4 @@ go.work.sum
 
 # Local environment variables
 .env
+tmp/build-errors.log

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/studio-b12/gowebdav"
 )
@@ -43,10 +46,29 @@ func listFiles() ([]string, error) {
 	return result, nil
 }
 
-func uploadChunk(chunk []byte, chunkIndex int, originalFilename string) error {
+type ProgressMessage struct {
+	TotalWritten int64 `json:"totalWritten"`
+	TotalSize    int64 `json:"totalSize"`
+}
+
+func uploadChunk(chunk []byte, chunkIndex int, originalFilename string, ws *websocket.Conn, totalSize int64, startOffset int64) error {
 	c := newWebdavClient()
-	path := fmt.Sprintf("/%s.chunk%d", originalFilename, chunkIndex)
-	return c.Write(path, chunk, 0644)
+	path := fmt.Sprintf("%s.chunk%d", originalFilename, chunkIndex)
+
+	err := c.Write(path, chunk, 0644)
+	if err != nil {
+		return err
+	}
+
+	progress := ProgressMessage{
+		TotalWritten: startOffset + int64(len(chunk)),
+		TotalSize:    totalSize,
+	}
+
+	msg, _ := json.Marshal(progress)
+	ws.WriteMessage(websocket.TextMessage, msg)
+
+	return nil
 }
 
 func downloadFile(filename string, w io.Writer) error {
@@ -73,7 +95,7 @@ func downloadFile(filename string, w io.Writer) error {
 	})
 
 	for _, chunkName := range chunks {
-		rc, err := c.ReadStream(fmt.Sprintf("/%s", chunkName))
+		rc, err := c.ReadStream(chunkName)
 		if err != nil {
 			return err
 		}
@@ -95,7 +117,7 @@ func deleteFile(filename string) error {
 
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), filename) {
-			err := c.Remove(fmt.Sprintf("/%s", f.Name()))
+			err := c.Remove(f.Name())
 			if err != nil {
 				// Log error but continue trying to delete other chunks
 				fmt.Printf("failed to delete chunk %s: %v\n", f.Name(), err)
