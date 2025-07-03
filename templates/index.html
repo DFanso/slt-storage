@@ -65,9 +65,16 @@
             <!-- File List Section -->
             <div class="bg-white p-6 rounded-lg shadow-lg">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold text-gray-700">Stored Files</h2>
-                    <div id="loading-spinner" class="hidden">
-                        <ion-icon name="reload-outline" class="text-2xl text-gray-500 animate-spin"></ion-icon>
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-2xl font-bold text-gray-700">Stored Files</h2>
+                        <div id="loading-spinner" class="hidden">
+                            <ion-icon name="reload-outline" class="text-2xl text-gray-500 animate-spin"></ion-icon>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-semibold text-gray-500 w-24 text-right">Size</span>
+                        <div class="w-8"></div> <!-- Spacer for download icon -->
+                        <div class="w-8"></div> <!-- Spacer for delete icon -->
                     </div>
                 </div>
                 <ul id="file-list" class="space-y-2">

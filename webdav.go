@@ -19,6 +19,7 @@ type WebDAVFile struct {
 	Name  string `json:"name"`
 	Path  string `json:"path"`
 	IsDir bool   `json:"isDir"`
+	Size  int64  `json:"size"`
 }
 
 type ProgressMessage struct {
@@ -51,11 +52,14 @@ func listFiles(path string) ([]WebDAVFile, error) {
 		if strings.Contains(f.Name(), ".chunk") {
 			originalName := strings.Split(f.Name(), ".chunk")[0]
 			originalPath := filepath.ToSlash(filepath.Join(path, originalName))
-			if _, exists := fileMap[originalPath]; !exists {
-				fileMap[originalPath] = WebDAVFile{Name: originalName, Path: originalPath, IsDir: false}
+			if existing, exists := fileMap[originalPath]; !exists {
+				fileMap[originalPath] = WebDAVFile{Name: originalName, Path: originalPath, IsDir: false, Size: f.Size()}
+			} else {
+				existing.Size += f.Size()
+				fileMap[originalPath] = existing
 			}
 		} else {
-			fileMap[fullPath] = WebDAVFile{Name: f.Name(), Path: fullPath, IsDir: false}
+			fileMap[fullPath] = WebDAVFile{Name: f.Name(), Path: fullPath, IsDir: false, Size: f.Size()}
 		}
 	}
 

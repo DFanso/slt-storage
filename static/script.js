@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="font-medium text-gray-700">${file.name}</span>
                     </div>
                     <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500 w-24 text-right">${file.isDir ? '' : formatBytes(file.size)}</span>
                         <a href="/api/download?path=${encodeURIComponent(file.path)}" class="download-link text-blue-500 hover:text-blue-700 transition-colors" title="Download" style="${file.isDir ? 'display: none;' : ''}">
                             <ion-icon name="download-outline" class="text-2xl"></ion-icon>
                         </a>
@@ -170,6 +171,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         ws.close();
+    };
+
+    const formatBytes = (bytes, decimals = 2) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
     };
 
     const handleFiles = (newFiles) => {
