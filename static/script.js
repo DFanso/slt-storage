@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingSpinner = document.getElementById('loading-spinner');
     const breadcrumb = document.getElementById('breadcrumb');
     const createFolderBtn = document.getElementById('create-folder-btn');
+    const uploadContainer = document.getElementById('upload-container');
 
     // --- State ---
     let currentPath = '/';
@@ -171,13 +172,18 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.close();
     };
 
-    const handleFiles = (files) => {
-        filesToUpload = Array.from(files);
-        if (filesToUpload.length === 0) return;
+    const handleFiles = (newFiles) => {
+        const uniqueNewFiles = Array.from(newFiles).filter(file => !filesToUpload.some(existingFile => existingFile.name === file.name && existingFile.size === file.size));
 
-        renderSelectionList();
-        dropZone.classList.add('hidden');
-        selectionContainer.classList.remove('hidden');
+        if (uniqueNewFiles.length > 0) {
+            filesToUpload.push(...uniqueNewFiles);
+        }
+
+        if (filesToUpload.length > 0) {
+            renderSelectionList();
+            dropZone.classList.add('hidden');
+            selectionContainer.classList.remove('hidden');
+        }
     };
 
     // --- Event Listeners ---
@@ -186,15 +192,33 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); });
+        uploadContainer.addEventListener(eventName, e => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
     });
+
     ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.add('border-blue-500', 'bg-blue-50'));
+        uploadContainer.addEventListener(eventName, () => {
+            uploadContainer.classList.add('bg-blue-50');
+            if (filesToUpload.length === 0) {
+                dropZone.classList.add('border-blue-500');
+            }
+        });
     });
+
     ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-blue-500', 'bg-blue-50'));
+        uploadContainer.addEventListener(eventName, () => {
+            uploadContainer.classList.remove('bg-blue-50');
+            if (filesToUpload.length === 0) {
+                dropZone.classList.remove('border-blue-500');
+            }
+        });
     });
-    dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+
+    uploadContainer.addEventListener('drop', (e) => {
+        handleFiles(e.dataTransfer.files);
+    });
 
     breadcrumb.addEventListener('click', (e) => {
         if (e.target.tagName === 'A') {
